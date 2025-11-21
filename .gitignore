@@ -205,3 +205,21 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# AstralSealTransl Specific
+# Configuration files with sensitive API keys
+config.yaml
+
+# Input/Output directories (keep structure but ignore content)
+input/*
+!input/.gitkeep
+output/*
+!output/.gitkeep
+
+# Translation cache
+.translation_cache/
+*.cache
+
+# Temporary files
+*.tmp
+*.temp

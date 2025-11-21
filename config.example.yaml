@@ -1,0 +1,48 @@
+# AstralSealTransl Configuration File
+# This file contains all settings for the visual novel translation system
+
+# Backend-specific settings for API providers
+backendSpecific:
+  OpenAI-Compatible:
+    tokens:
+      # You can configure multiple API endpoints
+      - token: sk-proj-YOUR_API_KEY_HERE           # Your OpenAI API key
+        endpoint: https://api.openai.com/v1/chat/completions  # API endpoint URL
+        modelName: gpt-4-turbo-2024-04-09          # Model to use (gpt-4, gpt-3.5-turbo, etc.)
+        stream: true                                # Enable streaming responses
+
+# Common settings for all translation operations
+common:
+  # Target language code (ISO 639-1)
+  # Examples: "en" (English), "th" (Thai), "zh" (Chinese), "ja" (Japanese), "ko" (Korean)
+  language: "th"
+
+  # GPT-specific translation settings
+  gpt:
+    # Number of sentences to translate per API request
+    # Recommended: 10 (balances context and API cost)
+    numPerRequestTranslate: 10
+
+    # Number of previous sentences to include as context
+    # Helps maintain character consistency and pronoun accuracy
+    # Recommended: 8
+    contextNum: 8
+
+    # Temperature (0.0-2.0): Controls translation creativity
+    # Lower = more deterministic, Higher = more creative
+    # Recommended: 0.3 for consistent translations
+    temperature: 0.3
+
+    # Frequency penalty (0.0-2.0): Reduces repetitive phrasing
+    # Recommended: 0.2
+    frequency_penalty: 0.2
+
+  # Number of parallel workers per project (future feature)
+  workersPerProject: 1
+
+  # Input directory path (relative or absolute)
+  inputPath: "/input"
+
+  # Input file type
+  # Supported: "xlsx", "json", "txt", "csv"
+  inputType: "xlsx"
