@@ -124,6 +124,16 @@ def main():
         # ============================================================
         logger.info("Parsing API response...")
         content = client.parse_response(response)
+
+        # DEBUG: Show raw response content
+        print("\n" + "="*70)
+        print("🔍 RAW RESPONSE CONTENT (for debugging)")
+        print("="*70)
+        print(content)
+        print("="*70)
+        print(f"📏 Content length: {len(content)} characters")
+        print("="*70)
+
         translations = client.extract_jsonline(content)
 
         # ============================================================

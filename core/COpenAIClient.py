@@ -118,11 +118,11 @@ class COpenAIClient:
 
         try:
             # Make API call (synchronous only)
+            # Note: GPT-5 models (gpt-5, gpt-5-mini, gpt-5-nano) don't support
+            # temperature, frequency_penalty, or max_tokens parameters
             response = self.client.chat.completions.create(
                 model=self.token_config.modelName,
                 messages=messages,
-                temperature=self.config.gpt.temperature,
-                frequency_penalty=self.config.gpt.frequency_penalty,
                 stream=False  # Explicitly disable streaming
             )
 

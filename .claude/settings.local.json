@@ -2,7 +2,12 @@
   "permissions": {
     "allow": [
       "Bash(python test_config.py:*)",
-      "Bash(python test_openai_client.py:*)"
+      "Bash(python test_openai_client.py:*)",
+      "WebFetch(domain:platform.openai.com)",
+      "WebSearch",
+      "WebFetch(domain:docs.langdock.com)",
+      "WebFetch(domain:docs.m5stack.com)",
+      "WebFetch(domain:github.com)"
     ],
     "deny": [],
     "ask": []
