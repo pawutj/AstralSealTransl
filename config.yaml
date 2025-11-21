@@ -1,0 +1,16 @@
+backendSpecific:
+  OpenAI-Compatible:
+    tokens:
+      - token: sk-proj
+        endpoint: https://api.openai.com/v1/responses 
+        modelName: gpt-5-nano
+        stream: true
+
+common:
+  language: "th" 
+  gpt:
+    numPerRequestTranslate: 10  
+    contextNum: 8
+  workersPerProject: 1
+  inputPath: "/input"
+  inputType: "xlsx"
