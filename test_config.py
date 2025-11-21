@@ -18,7 +18,6 @@ def test_config():
         # Display configuration
         print(config)
         print("\n" + "-" * 60)
-
         # Test backend-specific settings
         print("Backend Configuration:")
         print(f"  Total tokens configured: {len(config.tokens)}")
