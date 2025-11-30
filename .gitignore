@@ -223,3 +223,5 @@ output/*
 # Temporary files
 *.tmp
 *.temp
+
+config.yaml
