@@ -8,7 +8,8 @@
       "WebFetch(domain:docs.langdock.com)",
       "WebFetch(domain:docs.m5stack.com)",
       "WebFetch(domain:github.com)",
-      "Bash(python test_xlsx.py:*)"
+      "Bash(python test_xlsx.py:*)",
+      "Bash(python:*)"
     ],
     "deny": [],
     "ask": []

@@ -20,7 +20,8 @@ from core.CConfig import CConfig, XLSXConfig
 @dataclass
 class RowData:
     """Single row data structure"""
-    row_id: int
+    row_id: int          # Sequential ID for JSONLine (1, 2, 3, ...)
+    excel_row: int       # Original Excel row number (for writing back)
     name: str
     src: str
 
@@ -52,6 +53,7 @@ class XLSXCore:
         """
         self.config = config
         self.xlsx_config = config.xlsx
+        self.row_mapping: Dict[int, int] = {}  # Maps JSONLine ID -> Excel row number
 
     def readXlsx(self) -> str:
         """
@@ -158,7 +160,7 @@ class XLSXCore:
         return headers.index(column_name) + 1
 
     def _extract_rows(self, sheet: Worksheet) -> List[RowData]:
-        """Extract data rows from worksheet"""
+        """Extract data rows from worksheet, skipping empty source rows"""
         header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(h) if h else "" for h in header_row]
 
@@ -167,18 +169,30 @@ class XLSXCore:
 
         rows_data = []
         row_id = 1
+        excel_row_num = 2  # Excel rows start at 2 (after header)
 
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            name_value = row[name_index] if row[name_index] else ""
             src_value = row[src_index] if row[src_index] else ""
+
+            # Skip rows with empty source text
+            if not src_value or not src_value.strip():
+                excel_row_num += 1
+                continue
+
+            name_value = row[name_index] if row[name_index] else ""
 
             rows_data.append(RowData(
                 row_id=row_id,
+                excel_row=excel_row_num,
                 name=str(name_value),
                 src=str(src_value)
             ))
 
+            # Store mapping for later use in writeXlsx
+            self.row_mapping[row_id] = excel_row_num
+
             row_id += 1
+            excel_row_num += 1
 
         return rows_data
 
@@ -242,20 +256,21 @@ class XLSXCore:
         translations: Dict[int, str]
     ) -> int:
         """
-        Write translations to worksheet.
+        Write translations to worksheet using row mapping.
 
         Returns:
             Number of rows written
         """
         written_count = 0
 
-        for row_num in range(2, sheet.max_row + 1):
-            row_id = row_num - 1
+        for json_id, translated_text in translations.items():
+            # Use mapping to find correct Excel row
+            if json_id not in self.row_mapping:
+                print(f"⚠️  Warning: JSONLine ID {json_id} not found in row mapping, skipping")
+                continue
 
-            if row_id in translations:
-                sheet.cell(row=row_num, column=column_index).value = translations[row_id]
-                written_count += 1
-            else:
-                print(f"⚠️  Warning: ID {row_id} not found in translations, skipping")
+            excel_row = self.row_mapping[json_id]
+            sheet.cell(row=excel_row, column=column_index).value = translated_text
+            written_count += 1
 
         return written_count

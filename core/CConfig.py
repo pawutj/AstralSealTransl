@@ -73,7 +73,9 @@ class CConfig:
         self.tokens: List[TokenConfig] = []
 
         # Common settings
-        self.language: str = "en"
+        self.srcLanguage: str = "en"      # Source language
+        self.targetLanguage: str = "en"   # Target language
+        self.language: str = "en"         # Deprecated: use targetLanguage
         self.gpt: GPTConfig = GPTConfig()
         self.workersPerProject: int = 1
         self.inputPath: str = "/input"
@@ -127,8 +129,11 @@ class CConfig:
         """Parse common section"""
         common = self._raw_config.get('common', {})
 
-        # Language setting
-        self.language = common.get('language', 'en')
+        # Language settings
+        self.srcLanguage = common.get('srcLanguage', 'en')
+        self.targetLanguage = common.get('targetLanguage', 'en')
+        # Backward compatibility: language defaults to targetLanguage
+        self.language = common.get('language', self.targetLanguage)
 
         # GPT settings
         gpt_config = common.get('gpt', {})
@@ -185,8 +190,10 @@ class CConfig:
             errors.append("frequency_penalty must be between 0.0 and 2.0")
 
         # Validate common settings
-        if not self.language:
-            errors.append("language is required")
+        if not self.srcLanguage:
+            errors.append("srcLanguage is required")
+        if not self.targetLanguage:
+            errors.append("targetLanguage is required")
         if self.workersPerProject <= 0:
             errors.append("workersPerProject must be positive")
         if not self.inputPath:
@@ -251,7 +258,8 @@ class CConfig:
                 }
             },
             'common': {
-                'language': self.language,
+                'srcLanguage': self.srcLanguage,
+                'targetLanguage': self.targetLanguage,
                 'gpt': {
                     'numPerRequestTranslate': self.gpt.numPerRequestTranslate,
                     'contextNum': self.gpt.contextNum,
@@ -277,7 +285,8 @@ class CConfig:
         """String representation of configuration"""
         return (
             f"CConfig(\n"
-            f"  language='{self.language}',\n"
+            f"  srcLanguage='{self.srcLanguage}',\n"
+            f"  targetLanguage='{self.targetLanguage}',\n"
             f"  tokens={len(self.tokens)},\n"
             f"  inputType='{self.inputType}',\n"
             f"  batchSize={self.gpt.numPerRequestTranslate},\n"
@@ -292,7 +301,8 @@ if __name__ == "__main__":
         config = CConfig("../config.yaml")
         print("Configuration loaded successfully!")
         print(config)
-        print(f"\nTarget language: {config.language}")
+        print(f"\nSource language: {config.srcLanguage}")
+        print(f"Target language: {config.targetLanguage}")
         print(f"Model: {config.get_primary_token().modelName}")
         print(f"Batch size: {config.gpt.numPerRequestTranslate}")
         print(f"Context window: {config.gpt.contextNum}")

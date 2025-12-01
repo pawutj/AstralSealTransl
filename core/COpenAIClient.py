@@ -263,11 +263,20 @@ class COpenAIClient:
                 parsed = json.loads(line)
                 results.append(parsed)
             except json.JSONDecodeError as e:
-                self.logger.error(
-                    f"JSON decode error at line {line_num}: {e}"
+                self.logger.warning(
+                    f"Skipping malformed JSON at line {line_num}: {e}\n"
+                    f"Problematic line: {line[:200]}..."
                 )
-                raise
+                continue  # Skip and continue processing
 
         self.logger.info(f"Extracted {len(results)} JSONLine objects")
+
+        # Warn if lines were skipped
+        expected_lines = len([l for l in jsonline_content.splitlines() if l.strip()])
+        if len(results) < expected_lines:
+            self.logger.warning(
+                f"Extracted {len(results)}/{expected_lines} lines - "
+                f"{expected_lines - len(results)} lines skipped due to errors"
+            )
 
         return results

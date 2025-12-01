@@ -33,7 +33,8 @@ def main():
         # ============================================================
         logger.info("Loading configuration from config.yaml")
         config = CConfig("config.yaml")
-        target_lang = config.language
+        target_lang = config.targetLanguage
+        logger.info(f"Source language: {config.srcLanguage}")
         logger.info(f"Target language: {target_lang}")
 
         # ============================================================

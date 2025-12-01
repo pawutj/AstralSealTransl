@@ -1,0 +1,4 @@
+- เพิ่ม config.yaml language -> srcLanguage , targetLanguage 
+- main_integral แก้จาก ยิง mock เป็นยิง api จริง ดูตัวอย่างได้จาก main.py  โดยอย่าลืมใช้ numPerRequestTranslate , contextNum
+- ปัจจุบัน มี xlsx ตอนเจอ "" จะแปลต่อ ทำให้นับ rows เกิน แก้ไขปัญหานี้หน่อย
+- เน้นความ clean ของ Code 

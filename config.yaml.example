@@ -1,0 +1,31 @@
+# AstralSealTransl Configuration Template
+# Copy this file to config.yaml and fill in your actual values
+
+backendSpecific:
+  OpenAI-Compatible:
+    tokens:
+      - token: YOUR_OPENAI_API_KEY_HERE  # Or use environment variable
+        endpoint: https://api.openai.com/v1
+        modelName: gpt-4-turbo-2024-04-09  # or gpt-3.5-turbo, gpt-4, etc.
+        stream: true
+
+common:
+  srcLanguage: "ja"       # Source language (ISO 639-1): ja, en, zh, ko, etc.
+  targetLanguage: "th"    # Target language (ISO 639-1): th, en, ja, zh, etc.
+  gpt:
+    numPerRequestTranslate: 10  # Sentences per API batch (recommended: 10-15)
+    contextNum: 8               # Previous translations for context (recommended: 8)
+    temperature: 0.3            # Creativity (0.0-1.0, lower = more consistent)
+    frequency_penalty: 0.2      # Reduce repetition (0.0-2.0)
+  workersPerProject: 1          # Parallel workers (future feature)
+  inputPath: "/input"
+  inputType: "xlsx"
+
+xlsx:
+  filePath: "input/jp_script.xlsx"        # Input XLSX file path
+  outputPath: "output/translated.xlsx"   # Output XLSX file path
+  nameColumn: "who_talk"                 # Column for character names
+  srcColumn: "talk"                      # Column for source text
+  targetColumn: "ローカライズ"            # Column for translated text
+  sheetName: "s4_1"                      # Sheet name to process
+  validateColumns: true                  # Validate column existence before processing
