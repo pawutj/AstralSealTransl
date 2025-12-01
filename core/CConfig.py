@@ -29,6 +29,18 @@ class GPTConfig:
     frequency_penalty: float = 0.2
 
 
+@dataclass
+class XLSXConfig:
+    """XLSX file processing settings"""
+    filePath: str = "input/jp_script.xlsx"
+    outputPath: str = "output/translated.xlsx"
+    nameColumn: str = "who_talk"
+    srcColumn: str = "talk"
+    targetColumn: str = "talk_jp"
+    sheetName: str = "Sheet1"
+    validateColumns: bool = True
+
+
 class CConfig:
     """
     Configuration manager for AstralSealTransl project.
@@ -67,6 +79,9 @@ class CConfig:
         self.inputPath: str = "/input"
         self.inputType: str = "xlsx"
 
+        # XLSX-specific settings
+        self.xlsx: XLSXConfig = XLSXConfig()
+
         # Load configuration
         self._load()
 
@@ -86,6 +101,9 @@ class CConfig:
 
         # Parse common settings
         self._parse_common()
+
+        # Parse XLSX settings
+        self._parse_xlsx()
 
         # Validate configuration
         self._validate()
@@ -126,6 +144,20 @@ class CConfig:
         self.inputPath = common.get('inputPath', '/input')
         self.inputType = common.get('inputType', 'xlsx')
 
+    def _parse_xlsx(self) -> None:
+        """Parse xlsx section"""
+        xlsx_config = self._raw_config.get('xlsx', {})
+
+        self.xlsx = XLSXConfig(
+            filePath=xlsx_config.get('filePath', 'input/jp_script.xlsx'),
+            outputPath=xlsx_config.get('outputPath', 'output/translated.xlsx'),
+            nameColumn=xlsx_config.get('nameColumn', 'who_talk'),
+            srcColumn=xlsx_config.get('srcColumn', 'talk'),
+            targetColumn=xlsx_config.get('targetColumn', 'talk_jp'),
+            sheetName=xlsx_config.get('sheetName', 'Sheet1'),
+            validateColumns=xlsx_config.get('validateColumns', True)
+        )
+
     def _validate(self) -> None:
         """Validate configuration values"""
         errors = []
@@ -161,6 +193,20 @@ class CConfig:
             errors.append("inputPath is required")
         if not self.inputType:
             errors.append("inputType is required")
+
+        # Validate XLSX settings
+        if not self.xlsx.filePath:
+            errors.append("xlsx.filePath is required")
+        if not self.xlsx.outputPath:
+            errors.append("xlsx.outputPath is required")
+        if not self.xlsx.nameColumn:
+            errors.append("xlsx.nameColumn is required")
+        if not self.xlsx.srcColumn:
+            errors.append("xlsx.srcColumn is required")
+        if not self.xlsx.targetColumn:
+            errors.append("xlsx.targetColumn is required")
+        if not self.xlsx.sheetName:
+            errors.append("xlsx.sheetName is required")
 
         if errors:
             raise ValueError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))
@@ -215,6 +261,15 @@ class CConfig:
                 'workersPerProject': self.workersPerProject,
                 'inputPath': self.inputPath,
                 'inputType': self.inputType
+            },
+            'xlsx': {
+                'filePath': self.xlsx.filePath,
+                'outputPath': self.xlsx.outputPath,
+                'nameColumn': self.xlsx.nameColumn,
+                'srcColumn': self.xlsx.srcColumn,
+                'targetColumn': self.xlsx.targetColumn,
+                'sheetName': self.xlsx.sheetName,
+                'validateColumns': self.xlsx.validateColumns
             }
         }
 
