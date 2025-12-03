@@ -105,7 +105,7 @@ class XLSXCore:
         workbook = load_workbook(source_path)
         sheet = self._get_sheet(workbook, self.xlsx_config.sheetName)
 
-        column_index = self._get_column_index(sheet, self.xlsx_config.targetColumn)
+        column_index = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn)
 
         # Prepare output path
         output_path = Path(self.xlsx_config.outputPath)
@@ -119,7 +119,7 @@ class XLSXCore:
                     "Dual-target translations detected but targetColumn2 not configured in config.yaml"
                 )
 
-            column_index2 = self._get_column_index(sheet, self.xlsx_config.targetColumn2)
+            column_index2 = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn2)
             written_count = self._write_dual_translations(
                 sheet, column_index, column_index2, translations
             )
@@ -177,6 +177,33 @@ class XLSXCore:
             )
 
         return headers.index(column_name) + 1
+
+    def _get_or_create_column_index(self, sheet: Worksheet, column_name: str) -> int:
+        """
+        Get column index by name (1-based), or create new column if not exists.
+
+        If column doesn't exist, adds it to the end of the header row.
+
+        Args:
+            sheet: Worksheet to check/modify
+            column_name: Name of column to find or create
+
+        Returns:
+            Column index (1-based)
+        """
+        header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
+        headers = [str(h) if h else "" for h in header_row]
+
+        if column_name in headers:
+            # Column exists, return its index
+            return headers.index(column_name) + 1
+
+        # Column doesn't exist - create it at the end
+        new_column_index = len(headers) + 1
+        sheet.cell(row=1, column=new_column_index).value = column_name
+        print(f"ℹ️  Created new column '{column_name}' at position {new_column_index}")
+
+        return new_column_index
 
     def _extract_rows(self, sheet: Worksheet) -> List[RowData]:
         """Extract data rows from worksheet, skipping empty source rows"""
