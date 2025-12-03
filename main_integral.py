@@ -18,8 +18,7 @@ from typing import List, Dict
 from core.CConfig import CConfig
 from core.XLSXCore import XLSXCore
 from core.COpenAIClient import COpenAIClient
-from core.Prompts import GPT4_SYSTEM_PROMPT, GPT4_TRANS_PROMPT, GPT4_SYSTEM_PROMPT_CACHED
-
+from core.Prompts import GPT4_SYSTEM_PROMPT, GPT4_TRANS_PROMPT, GPT4_SYSTEM_PROMPT_CACHED, GPT4_TWO_STEP_PROMPT
 # Setup logging
 logging.basicConfig(
     level=logging.INFO,
@@ -198,7 +197,7 @@ def build_translation_messages(
     if use_cached_prompt:
         # NEW: Optimized structure for caching
         # System prompt is now >1024 tokens and fully static
-        system_prompt = GPT4_SYSTEM_PROMPT_CACHED.replace("[TargetLang]", target_lang)
+        system_prompt = GPT4_TWO_STEP_PROMPT.replace("[TargetLang]", target_lang)
         system_prompt = system_prompt.replace("[Glossary]", glossary)
 
         # Build user message with context + input
