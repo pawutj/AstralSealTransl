@@ -9,7 +9,9 @@
       "WebFetch(domain:docs.m5stack.com)",
       "WebFetch(domain:github.com)",
       "Bash(python test_xlsx.py:*)",
-      "Bash(python:*)"
+      "Bash(python:*)",
+      "WebFetch(domain:openai.com)",
+      "Bash(Select-String -Pattern \"cache\" -Context 0,1)"
     ],
     "deny": [],
     "ask": []

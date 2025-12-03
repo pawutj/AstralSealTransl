@@ -28,6 +28,10 @@ class GPTConfig:
     temperature: float = 0.3
     frequency_penalty: float = 0.2
 
+    # Prompt Caching settings (GPT-5.1 Extended Caching)
+    enablePromptCaching: bool = True
+    promptCacheRetention: str = "24h"  # "5m", "1h", "24h"
+
 
 @dataclass
 class XLSXConfig:
@@ -141,7 +145,9 @@ class CConfig:
             numPerRequestTranslate=gpt_config.get('numPerRequestTranslate', 10),
             contextNum=gpt_config.get('contextNum', 8),
             temperature=gpt_config.get('temperature', 0.3),
-            frequency_penalty=gpt_config.get('frequency_penalty', 0.2)
+            frequency_penalty=gpt_config.get('frequency_penalty', 0.2),
+            enablePromptCaching=gpt_config.get('enablePromptCaching', True),
+            promptCacheRetention=gpt_config.get('promptCacheRetention', '24h')
         )
 
         # Other common settings
@@ -264,7 +270,9 @@ class CConfig:
                     'numPerRequestTranslate': self.gpt.numPerRequestTranslate,
                     'contextNum': self.gpt.contextNum,
                     'temperature': self.gpt.temperature,
-                    'frequency_penalty': self.gpt.frequency_penalty
+                    'frequency_penalty': self.gpt.frequency_penalty,
+                    'enablePromptCaching': self.gpt.enablePromptCaching,
+                    'promptCacheRetention': self.gpt.promptCacheRetention
                 },
                 'workersPerProject': self.workersPerProject,
                 'inputPath': self.inputPath,
