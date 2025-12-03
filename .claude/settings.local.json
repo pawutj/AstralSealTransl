@@ -11,7 +11,8 @@
       "Bash(python test_xlsx.py:*)",
       "Bash(python:*)",
       "WebFetch(domain:openai.com)",
-      "Bash(Select-String -Pattern \"cache\" -Context 0,1)"
+      "Bash(Select-String -Pattern \"cache\" -Context 0,1)",
+      "Bash(find:*)"
     ],
     "deny": [],
     "ask": []

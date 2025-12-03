@@ -7,7 +7,7 @@ translations back to XLSX format using JSONLine intermediate format.
 
 import json
 from pathlib import Path
-from typing import Dict, List, Optional
+from typing import Dict, List, Optional, Union, Tuple
 from dataclasses import dataclass
 
 from openpyxl import load_workbook
@@ -86,12 +86,16 @@ class XLSXCore:
         """
         Write translated JSONLine to XLSX file.
 
+        Supports both single-target and dual-target modes:
+        - Single: {"id":1,"dst":"..."}
+        - Dual: {"id":1,"dst1":"direct","dst2":"localized"}
+
         Args:
-            jsonline_input: JSONLine string with format: {"id":1,"dst":"..."}
+            jsonline_input: JSONLine string with translations
 
         Raises:
             FileNotFoundError: If source XLSX doesn't exist
-            ValueError: If JSONLine format is invalid
+            ValueError: If JSONLine format is invalid or dual-target without targetColumn2
         """
         translations = self._parse_jsonline(jsonline_input)
 
@@ -103,15 +107,30 @@ class XLSXCore:
 
         column_index = self._get_column_index(sheet, self.xlsx_config.targetColumn)
 
-        written_count = self._write_translations(sheet, column_index, translations)
-
+        # Prepare output path
         output_path = Path(self.xlsx_config.outputPath)
         output_path.parent.mkdir(parents=True, exist_ok=True)
 
+        # Detect dual-target mode by checking first translation value type
+        if translations and isinstance(next(iter(translations.values())), tuple):
+            # Dual-target mode: write to both columns
+            if not self.xlsx_config.targetColumn2:
+                raise ValueError(
+                    "Dual-target translations detected but targetColumn2 not configured in config.yaml"
+                )
+
+            column_index2 = self._get_column_index(sheet, self.xlsx_config.targetColumn2)
+            written_count = self._write_dual_translations(
+                sheet, column_index, column_index2, translations
+            )
+            print(f"✅ Written {written_count} dual translations (direct + localized) to {output_path}")
+        else:
+            # Single-target mode: write to one column
+            written_count = self._write_translations(sheet, column_index, translations)
+            print(f"✅ Written {written_count} translations to {output_path}")
+
         workbook.save(output_path)
         workbook.close()
-
-        print(f"✅ Written {written_count} translations to {output_path}")
 
     def _validate_file_exists(self, file_path: Path) -> None:
         """Validate that file exists"""
@@ -210,17 +229,19 @@ class XLSXCore:
 
         return "\n".join(lines)
 
-    def _parse_jsonline(self, jsonline_input: str) -> Dict[int, str]:
+    def _parse_jsonline(self, jsonline_input: str) -> Union[Dict[int, str], Dict[int, Tuple[str, str]]]:
         """
         Parse JSONLine input to translation dictionary.
 
         Returns:
-            Dict mapping row_id to translated text
+            - Dict[int, str]: Single-target mode {1: "translation"}
+            - Dict[int, Tuple[str, str]]: Dual-target mode {1: ("direct", "localized")}
 
         Raises:
             ValueError: If JSON format is invalid or missing required keys
         """
         translations = {}
+        is_dual_target = None
 
         for line_num, line in enumerate(jsonline_input.strip().split('\n'), start=1):
             if not line.strip():
@@ -234,18 +255,36 @@ class XLSXCore:
                     f"Error: {e}"
                 )
 
+            # Validate required fields
             if 'id' not in data:
                 raise ValueError(f"Missing 'id' at line {line_num}: {line}")
-            if 'dst' not in data:
-                raise ValueError(f"Missing 'dst' at line {line_num}: {line}")
 
             row_id = data['id']
-            translation = data['dst']
-
             if not isinstance(row_id, int):
                 raise ValueError(f"Invalid 'id' type at line {line_num}: expected int")
 
-            translations[row_id] = str(translation)
+            # Detect mode and validate consistency
+            has_dual = 'dst1' in data and 'dst2' in data
+            has_single = 'dst' in data
+
+            if is_dual_target is None:
+                # First line determines mode
+                is_dual_target = has_dual
+            elif is_dual_target != has_dual:
+                raise ValueError(
+                    f"Inconsistent output format at line {line_num}: "
+                    f"expected {'dual' if is_dual_target else 'single'}-target"
+                )
+
+            # Extract translations
+            if is_dual_target:
+                if not has_dual:
+                    raise ValueError(f"Missing dst1/dst2 at line {line_num}: {line}")
+                translations[row_id] = (str(data['dst1']), str(data['dst2']))
+            else:
+                if not has_single:
+                    raise ValueError(f"Missing dst at line {line_num}: {line}")
+                translations[row_id] = str(data['dst'])
 
         return translations
 
@@ -271,6 +310,39 @@ class XLSXCore:
 
             excel_row = self.row_mapping[json_id]
             sheet.cell(row=excel_row, column=column_index).value = translated_text
+            written_count += 1
+
+        return written_count
+
+    def _write_dual_translations(
+        self,
+        sheet: Worksheet,
+        column_index1: int,
+        column_index2: int,
+        translations: Dict[int, Tuple[str, str]]
+    ) -> int:
+        """
+        Write dual translations (direct + localized) to two columns.
+
+        Returns:
+            Number of rows written
+        """
+        written_count = 0
+
+        for json_id, (direct_trans, localized_trans) in translations.items():
+            # Use mapping to find correct Excel row
+            if json_id not in self.row_mapping:
+                print(f"⚠️  Warning: JSONLine ID {json_id} not found in row mapping, skipping")
+                continue
+
+            excel_row = self.row_mapping[json_id]
+
+            # Write direct translation to column 1
+            sheet.cell(row=excel_row, column=column_index1).value = direct_trans
+
+            # Write localized translation to column 2
+            sheet.cell(row=excel_row, column=column_index2).value = localized_trans
+
             written_count += 1
 
         return written_count

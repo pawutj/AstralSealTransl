@@ -335,7 +335,21 @@ def translate_with_api(
             all_translations.extend(translations)
 
             # Update context window (keep last N translations)
-            context_window.extend(translations)
+            # USER DECISION: For dual-target mode, include only dst1 to save tokens
+            if config.xlsx.has_dual_target():
+                # Extract only dst1 for context (40% token savings)
+                for item in translations:
+                    context_item = {"id": item["id"]}
+                    if 'dst1' in item:
+                        context_item["dst1"] = item["dst1"]
+                    elif 'dst' in item:
+                        # Fallback for backward compatibility
+                        context_item["dst1"] = item["dst"]
+                    context_window.append(context_item)
+            else:
+                # Single-target mode: keep full context (legacy)
+                context_window.extend(translations)
+
             if len(context_window) > context_size:
                 context_window = context_window[-context_size:]
 
@@ -347,10 +361,36 @@ def translate_with_api(
 
     # Convert back to JSONLine format
     result_lines = []
+    is_dual_target = config.xlsx.has_dual_target()
+
     for item in all_translations:
-        result_lines.append(
-            json.dumps({"id": item["id"], "dst": item["dst"]}, ensure_ascii=False)
-        )
+        # Detect dual-target vs single-target response
+        if 'dst1' in item and 'dst2' in item:
+            # Perfect dual-target response
+            result_lines.append(
+                json.dumps({
+                    "id": item["id"],
+                    "dst1": item["dst1"],
+                    "dst2": item["dst2"]
+                }, ensure_ascii=False)
+            )
+        elif 'dst' in item and is_dual_target:
+            # Fallback: API returned single dst in dual-target mode
+            # USER DECISION: Duplicate to both columns
+            result_lines.append(
+                json.dumps({
+                    "id": item["id"],
+                    "dst1": item["dst"],
+                    "dst2": item["dst"]  # Duplicate
+                }, ensure_ascii=False)
+            )
+        elif 'dst' in item:
+            # Single-target mode (backward compatibility)
+            result_lines.append(
+                json.dumps({"id": item["id"], "dst": item["dst"]}, ensure_ascii=False)
+            )
+        else:
+            raise ValueError(f"Invalid API response format: missing dst/dst1/dst2 in {item}")
 
     return "\n".join(result_lines)
 

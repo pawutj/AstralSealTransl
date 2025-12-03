@@ -57,18 +57,22 @@ Your output must start with "```jsonline" and write the whole result jsonlines i
 For each line in the output:
 1. Copy the value of `id` directly from input to the output jsonline (maintain sequential numbering)
 2. Follow the "translation_requirements" and "glossary", translate the value of `name` and `src` to [TargetLang]
-3. Change key `src` -> `dst`, and fill in your translation result
+3. Change key `src` -> `dst1` (Step 1: Direct Translation) and `dst2` (Step 2: Localization)
 4. Result should corresponds EXACTLY to the current source jsonline's text (one-to-one mapping)
 
 Then stop immediately, without any other explanations, notes, or commentary.
 
-Output Schema: { "id": int, (optional)"name": string, "dst": string }
+Output Schema: { "id": int, (optional)"name": string, "dst1": string, "dst2": string }
+
+Where:
+- dst1: Direct translation (Step 1) without localization
+- dst2: Localized translation (Step 2) adapted for native speakers
 
 Example output format:
 ```jsonline
-{"id": 1, "name": "キャラ名", "dst": "翻訳結果"}
-{"id": 2, "dst": "翻訳結果"}
-{"id": 3, "name": "キャラ名", "dst": "翻訳結果"}
+{"id": 1, "name": "キャラ名", "dst1": "直接翻訳", "dst2": "ローカライズ版"}
+{"id": 2, "dst1": "直接翻訳", "dst2": "ローカライズ版"}
+{"id": 3, "name": "キャラ名", "dst1": "直接翻訳", "dst2": "ローカライズ版"}
 ```
 </output_requirements>
 
@@ -168,18 +172,22 @@ Your output must start with "```jsonline" and write the whole result jsonlines i
 For each line in the output:
 1. Copy the value of `id` directly from input to the output jsonline (maintain sequential numbering)
 2. Follow the "translation_requirements" and "glossary", translate the value of `name` and `src` to [TargetLang]
-3. Change key `src` -> `dst`, and fill in your translation result
+3. Change key `src` -> `dst1` (Step 1: Direct Translation) and `dst2` (Step 2: Localization)
 4. Result should corresponds EXACTLY to the current source jsonline's text (one-to-one mapping)
 
 Then stop immediately, without any other explanations, notes, or commentary.
 
-Output Schema: { "id": int, (optional)"name": string, "dst": string }
+Output Schema: { "id": int, (optional)"name": string, "dst1": string, "dst2": string }
+
+Where:
+- dst1: Direct translation (Step 1) without localization
+- dst2: Localized translation (Step 2) adapted for native speakers
 
 Example output format:
 ```jsonline
-{"id": 1, "name": "キャラ名", "dst": "翻訳結果"}
-{"id": 2, "dst": "翻訳結果"}
-{"id": 3, "name": "キャラ名", "dst": "翻訳結果"}
+{"id": 1, "name": "キャラ名", "dst1": "直接翻訳", "dst2": "ローカライズ版"}
+{"id": 2, "dst1": "直接翻訳", "dst2": "ローカライズ版"}
+{"id": 3, "name": "キャラ名", "dst1": "直接翻訳", "dst2": "ローカライズ版"}
 ```
 </output_requirements>
 

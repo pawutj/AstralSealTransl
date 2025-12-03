@@ -41,8 +41,13 @@ class XLSXConfig:
     nameColumn: str = "who_talk"
     srcColumn: str = "talk"
     targetColumn: str = "talk_jp"
+    targetColumn2: Optional[str] = None  # Second target column for dual-target mode
     sheetName: str = "Sheet1"
     validateColumns: bool = True
+
+    def has_dual_target(self) -> bool:
+        """Check if dual-target mode is enabled"""
+        return self.targetColumn2 is not None
 
 
 class CConfig:
@@ -165,6 +170,7 @@ class CConfig:
             nameColumn=xlsx_config.get('nameColumn', 'who_talk'),
             srcColumn=xlsx_config.get('srcColumn', 'talk'),
             targetColumn=xlsx_config.get('targetColumn', 'talk_jp'),
+            targetColumn2=xlsx_config.get('targetColumn2'),  # Optional: dual-target mode
             sheetName=xlsx_config.get('sheetName', 'Sheet1'),
             validateColumns=xlsx_config.get('validateColumns', True)
         )
@@ -284,6 +290,7 @@ class CConfig:
                 'nameColumn': self.xlsx.nameColumn,
                 'srcColumn': self.xlsx.srcColumn,
                 'targetColumn': self.xlsx.targetColumn,
+                'targetColumn2': self.xlsx.targetColumn2,
                 'sheetName': self.xlsx.sheetName,
                 'validateColumns': self.xlsx.validateColumns
             }
