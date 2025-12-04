@@ -42,7 +42,7 @@ class XLSXConfig:
     srcColumn: str = "talk"
     targetColumn: str = "talk_jp"
     targetColumn2: Optional[str] = None  # Second target column for dual-target mode
-    sheetName: str = "Sheet1"
+    sheetName: List[str] = None  # List of sheets to process sequentially
     validateColumns: bool = True
 
     def has_dual_target(self) -> bool:
@@ -164,6 +164,16 @@ class CConfig:
         """Parse xlsx section"""
         xlsx_config = self._raw_config.get('xlsx', {})
 
+        # Parse sheetName as list (support both string and list formats)
+        sheet_name_config = xlsx_config.get('sheetName', ['Sheet1'])
+        if isinstance(sheet_name_config, str):
+            # Convert single string to list for consistency
+            sheet_names = [sheet_name_config]
+        elif isinstance(sheet_name_config, list):
+            sheet_names = sheet_name_config
+        else:
+            raise ValueError(f"Invalid sheetName format: {sheet_name_config}")
+
         self.xlsx = XLSXConfig(
             filePath=xlsx_config.get('filePath', 'input/jp_script.xlsx'),
             outputPath=xlsx_config.get('outputPath', 'output/translated.xlsx'),
@@ -171,7 +181,7 @@ class CConfig:
             srcColumn=xlsx_config.get('srcColumn', 'talk'),
             targetColumn=xlsx_config.get('targetColumn', 'talk_jp'),
             targetColumn2=xlsx_config.get('targetColumn2'),  # Optional: dual-target mode
-            sheetName=xlsx_config.get('sheetName', 'Sheet1'),
+            sheetName=sheet_names,  # Now a list
             validateColumns=xlsx_config.get('validateColumns', True)
         )
 
@@ -224,8 +234,8 @@ class CConfig:
             errors.append("xlsx.srcColumn is required")
         if not self.xlsx.targetColumn:
             errors.append("xlsx.targetColumn is required")
-        if not self.xlsx.sheetName:
-            errors.append("xlsx.sheetName is required")
+        if not self.xlsx.sheetName or len(self.xlsx.sheetName) == 0:
+            errors.append("xlsx.sheetName is required and must contain at least one sheet")
 
         if errors:
             raise ValueError("Configuration validation failed:\n" + "\n".join(f"  - {e}" for e in errors))

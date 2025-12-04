@@ -12,7 +12,8 @@
       "Bash(python:*)",
       "WebFetch(domain:openai.com)",
       "Bash(Select-String -Pattern \"cache\" -Context 0,1)",
-      "Bash(find:*)"
+      "Bash(find:*)",
+      "Bash(del test_validation.py)"
     ],
     "deny": [],
     "ask": []

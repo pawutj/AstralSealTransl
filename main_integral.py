@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 
 
 def main():
-    """Main execution workflow"""
+    """Main execution workflow for multi-sheet translation"""
 
     # ═══════════════════════════════════════════════════════
     # 1. Load Configuration
@@ -39,92 +39,119 @@ def main():
     print(f"   ✓ Target language: {config.targetLanguage}")
     print(f"   ✓ Input file: {config.xlsx.filePath}")
     print(f"   ✓ Output file: {config.xlsx.outputPath}")
-    print(f"   ✓ Sheet: {config.xlsx.sheetName}")
+    print(f"   ✓ Sheets to process: {', '.join(config.xlsx.sheetName)}")
     print(f"   ✓ Prompt Caching: {'Enabled' if config.gpt.enablePromptCaching else 'Disabled'}")
     if config.gpt.enablePromptCaching:
         print(f"   ✓ Cache Retention: {config.gpt.promptCacheRetention}")
     print()
 
     # ═══════════════════════════════════════════════════════
-    # 2. Initialize XLSX Core and OpenAI Client
+    # 2. Initialize Processors (Reuse OpenAI client)
     # ═══════════════════════════════════════════════════════
     xlsx_core = XLSXCore(config)
     openai_client = COpenAIClient(config)
 
     # ═══════════════════════════════════════════════════════
-    # 3. Read XLSX → JSONLine
+    # 3. Validate Sheets Exist (Fail Fast)
     # ═══════════════════════════════════════════════════════
-    print("📖 Reading XLSX file...")
+    print("🔍 Validating sheets...")
     try:
-        jsonline_data = xlsx_core.readXlsx()
-
-        # Display sample output
-        lines = jsonline_data.split('\n')
-        print(f"   ✓ Read {len(lines)} lines")
-        print()
-        print("📝 Sample JSONLine output (first 3 lines):")
-        for i, line in enumerate(lines[:3], 1):
-            print(f"   {i}. {line}")
-        print()
-
-        # Optional: Save JSONLine to file for inspection
-        output_jsonline = Path("output/source.jsonline")
-        output_jsonline.parent.mkdir(parents=True, exist_ok=True)
-        output_jsonline.write_text(jsonline_data, encoding='utf-8')
-        print(f"💾 Saved JSONLine to: {output_jsonline}")
-        print()
-
-    except FileNotFoundError as e:
-        print(f"   ❌ Error: {e}")
-        print("   💡 Make sure input/jp_script.xlsx exists")
-        return
+        validate_sheets_exist(config.xlsx.filePath, config.xlsx.sheetName)
+        print(f"   ✅ All {len(config.xlsx.sheetName)} sheets found")
     except ValueError as e:
         print(f"   ❌ Validation Error: {e}")
         return
-
-    # ═══════════════════════════════════════════════════════
-    # 4. Process Translations with OpenAI API
-    # ═══════════════════════════════════════════════════════
-    print("🔄 Processing translations via OpenAI API...")
-    print(f"   ℹ️  Batch size: {config.gpt.numPerRequestTranslate} sentences")
-    print(f"   ℹ️  Context window: {config.gpt.contextNum} previous translations")
     print()
 
-    try:
-        translated_jsonline = translate_with_api(
-            jsonline_input=jsonline_data,
-            config=config,
-            client=openai_client
-        )
-        print()
-        print(f"   ✅ Completed translation of {len(translated_jsonline.split(chr(10)))} sentences")
-        print()
+    # ═══════════════════════════════════════════════════════
+    # 4. Process Each Sheet Sequentially
+    # ═══════════════════════════════════════════════════════
+    total_sheets = len(config.xlsx.sheetName)
+    translations_by_sheet = {}  # Store all results: {sheet_name: jsonline}
+    results = []  # Track success/failure per sheet
 
-    except Exception as e:
-        print(f"   ❌ Translation Error: {e}")
-        logger.exception("Translation failed")
-        return
+    for sheet_num, sheet_name in enumerate(config.xlsx.sheetName, 1):
+        print("=" * 60)
+        print(f"[{sheet_num}/{total_sheets}] Processing sheet: {sheet_name}")
+        print("=" * 60)
+
+        try:
+            # Read XLSX → JSONLine
+            print(f"📖 Reading sheet '{sheet_name}'...")
+            jsonline_data = xlsx_core.readXlsx(sheet_name)
+
+            lines = jsonline_data.split('\n')
+            print(f"   ✓ Read {len(lines)} sentences")
+
+            # Translate via API
+            print(f"🔄 Translating...")
+            print(f"   ℹ️  Batch size: {config.gpt.numPerRequestTranslate}")
+            print(f"   ℹ️  Context window: {config.gpt.contextNum}")
+
+            translated_jsonline = translate_with_api(
+                jsonline_input=jsonline_data,
+                config=config,
+                client=openai_client
+            )
+
+            # Store result
+            translations_by_sheet[sheet_name] = translated_jsonline
+
+            result_lines = len(translated_jsonline.split('\n'))
+            print(f"   ✅ Translated {result_lines} sentences")
+
+            results.append({
+                "sheet": sheet_name,
+                "status": "success",
+                "sentences": result_lines
+            })
+
+        except FileNotFoundError as e:
+            print(f"   ❌ File Error: {e}")
+            results.append({"sheet": sheet_name, "status": "failed", "error": str(e)})
+            continue  # Continue to next sheet
+
+        except ValueError as e:
+            print(f"   ❌ Validation Error: {e}")
+            results.append({"sheet": sheet_name, "status": "failed", "error": str(e)})
+            continue
+
+        except Exception as e:
+            print(f"   ❌ Translation Error: {e}")
+            logger.exception(f"Sheet '{sheet_name}' translation failed")
+            results.append({"sheet": sheet_name, "status": "failed", "error": str(e)})
+            continue
+
+        print()
 
     # ═══════════════════════════════════════════════════════
-    # 5. Write JSONLine → XLSX
+    # 5. Write All Sheets to Single Output File
     # ═══════════════════════════════════════════════════════
-    print("💾 Writing translations to XLSX...")
-    try:
-        xlsx_core.writeXlsx(translated_jsonline)
-        print()
+    if translations_by_sheet:
         print("=" * 60)
-        print("✅ Workflow completed successfully!")
+        print("💾 Writing all translations to output file...")
         print("=" * 60)
-        print(f"📁 Output saved to: {config.xlsx.outputPath}")
+
+        try:
+            xlsx_core.writeMultipleSheets(translations_by_sheet)
+            print()
+        except Exception as e:
+            print(f"   ❌ Write Error: {e}")
+            logger.exception("Failed to write translations")
+            return
+    else:
+        print("⚠️  No translations to write (all sheets failed)")
         print()
 
-        # Display cache statistics
-        if config.gpt.enablePromptCaching:
-            openai_client.print_cache_statistics()
+    # ═══════════════════════════════════════════════════════
+    # 6. Print Summary Report
+    # ═══════════════════════════════════════════════════════
+    print_summary(results, config.xlsx.outputPath)
 
-    except Exception as e:
-        print(f"   ❌ Write Error: {e}")
-        return
+    # Display cache statistics
+    if config.gpt.enablePromptCaching:
+        print()
+        openai_client.print_cache_statistics()
 
 
 def split_into_batches(jsonline_input: str, batch_size: int) -> List[List[Dict]]:
@@ -393,6 +420,73 @@ def translate_with_api(
             raise ValueError(f"Invalid API response format: missing dst/dst1/dst2 in {item}")
 
     return "\n".join(result_lines)
+
+
+def validate_sheets_exist(input_path: str, sheet_names: List[str]) -> None:
+    """
+    Validate that all specified sheets exist in the input file.
+
+    Args:
+        input_path: Path to input XLSX file
+        sheet_names: List of sheet names to validate
+
+    Raises:
+        FileNotFoundError: If input file doesn't exist
+        ValueError: If any sheet doesn't exist
+    """
+    from openpyxl import load_workbook
+
+    file_path = Path(input_path)
+    if not file_path.exists():
+        raise FileNotFoundError(f"Input file not found: {input_path}")
+
+    workbook = load_workbook(input_path, read_only=True)
+    available_sheets = workbook.sheetnames
+    workbook.close()
+
+    invalid_sheets = [s for s in sheet_names if s not in available_sheets]
+    if invalid_sheets:
+        raise ValueError(
+            f"Sheets not found: {', '.join(invalid_sheets)}\n"
+            f"Available sheets: {', '.join(available_sheets)}"
+        )
+
+
+def print_summary(results: List[Dict], output_path: str) -> None:
+    """
+    Print processing summary with success/failure statistics.
+
+    Args:
+        results: List of result dicts with sheet, status, sentences, error
+        output_path: Path to output file
+    """
+    print("=" * 60)
+    print("📊 MULTI-SHEET PROCESSING SUMMARY")
+    print("=" * 60)
+
+    successful = [r for r in results if r["status"] == "success"]
+    failed = [r for r in results if r["status"] == "failed"]
+
+    # Print per-sheet results
+    for result in results:
+        if result["status"] == "success":
+            print(f"✅ {result['sheet']}: {result['sentences']} sentences")
+        else:
+            error_msg = result.get("error", "Unknown error")
+            print(f"❌ {result['sheet']}: {error_msg}")
+
+    print()
+    print(f"Total: {len(successful)}/{len(results)} sheets processed successfully")
+
+    if successful:
+        total_sentences = sum(r["sentences"] for r in successful)
+        print(f"Output: {output_path} ({total_sentences} total sentences)")
+
+    if failed:
+        print()
+        print(f"⚠️  {len(failed)} sheet(s) failed - review errors above")
+
+    print("=" * 60)
 
 
 if __name__ == "__main__":

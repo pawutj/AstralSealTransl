@@ -55,9 +55,12 @@ class XLSXCore:
         self.xlsx_config = config.xlsx
         self.row_mapping: Dict[int, int] = {}  # Maps JSONLine ID -> Excel row number
 
-    def readXlsx(self) -> str:
+    def readXlsx(self, sheet_name: Optional[str] = None) -> str:
         """
         Read XLSX file and convert to JSONLine format.
+
+        Args:
+            sheet_name: Optional sheet name to read. If None, uses config.sheetName[0]
 
         Returns:
             JSONLine string with format: {"id":1,"name":"...","src":"..."}
@@ -70,8 +73,11 @@ class XLSXCore:
 
         self._validate_file_exists(file_path)
 
+        # Use provided sheet name or default to first configured sheet
+        target_sheet = sheet_name if sheet_name else self.xlsx_config.sheetName[0]
+
         workbook = load_workbook(file_path, read_only=True, data_only=True)
-        sheet = self._get_sheet(workbook, self.xlsx_config.sheetName)
+        sheet = self._get_sheet(workbook, target_sheet)
 
         if self.xlsx_config.validateColumns:
             self._validate_columns(sheet)
@@ -131,6 +137,77 @@ class XLSXCore:
 
         workbook.save(output_path)
         workbook.close()
+
+    def writeMultipleSheets(self, translations_by_sheet: Dict[str, str]) -> None:
+        """
+        Write translations for multiple sheets to a single XLSX file.
+
+        This method efficiently handles multi-sheet writing by:
+        1. Loading the source workbook once
+        2. Writing translations to each specified sheet
+        3. Saving the complete workbook once
+
+        Args:
+            translations_by_sheet: Dict mapping sheet name -> JSONLine translations
+                Example: {
+                    "s4_1": '{"id":1,"dst":"..."}\\n{"id":2,"dst":"..."}',
+                    "s4_2": '{"id":1,"dst":"..."}\\n{"id":2,"dst":"..."}'
+                }
+
+        Raises:
+            FileNotFoundError: If source XLSX doesn't exist
+            ValueError: If sheet not found or JSONLine format invalid
+        """
+        source_path = Path(self.xlsx_config.filePath)
+        self._validate_file_exists(source_path)
+
+        # Load workbook once
+        workbook = load_workbook(source_path)
+
+        # Track statistics
+        total_written = 0
+        sheets_processed = []
+
+        try:
+            for sheet_name, jsonline_input in translations_by_sheet.items():
+                # Parse translations
+                translations = self._parse_jsonline(jsonline_input)
+
+                # Get target sheet
+                sheet = self._get_sheet(workbook, sheet_name)
+
+                # Detect and write translations (reuse existing logic)
+                column_index = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn)
+
+                if translations and isinstance(next(iter(translations.values())), tuple):
+                    # Dual-target mode
+                    if not self.xlsx_config.targetColumn2:
+                        raise ValueError(
+                            f"Sheet '{sheet_name}': Dual-target translations detected "
+                            f"but targetColumn2 not configured"
+                        )
+                    column_index2 = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn2)
+                    written_count = self._write_dual_translations(
+                        sheet, column_index, column_index2, translations
+                    )
+                else:
+                    # Single-target mode
+                    written_count = self._write_translations(sheet, column_index, translations)
+
+                total_written += written_count
+                sheets_processed.append(f"{sheet_name} ({written_count} sentences)")
+
+            # Save workbook once (all sheets written)
+            output_path = Path(self.xlsx_config.outputPath)
+            output_path.parent.mkdir(parents=True, exist_ok=True)
+            workbook.save(output_path)
+
+            print(f"✅ Written {len(translations_by_sheet)} sheets ({total_written} total sentences) to {output_path}")
+            for sheet_info in sheets_processed:
+                print(f"   - {sheet_info}")
+
+        finally:
+            workbook.close()
 
     def _validate_file_exists(self, file_path: Path) -> None:
         """Validate that file exists"""
