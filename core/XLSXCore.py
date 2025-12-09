@@ -283,7 +283,7 @@ class XLSXCore:
         return new_column_index
 
     def _extract_rows(self, sheet: Worksheet) -> List[RowData]:
-        """Extract data rows from worksheet, skipping empty source rows"""
+        """Extract data rows from worksheet, skipping empty narrator rows"""
         header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(h) if h else "" for h in header_row]
 
@@ -295,14 +295,27 @@ class XLSXCore:
         excel_row_num = 2  # Excel rows start at 2 (after header)
 
         for row in sheet.iter_rows(min_row=2, values_only=True):
-            src_value = row[src_index] if row[src_index] else ""
+            # Handle name_value first (might be float/int from Excel)
+            name_value = row[name_index]
+            if name_value is None:
+                name_value = ""
+            else:
+                name_value = str(name_value)  # Convert to string (handles float/int)
 
-            # Skip rows with empty source text
-            if not src_value or not src_value.strip():
+            # Handle src_value (might be float/int from Excel)
+            src_value = row[src_index]
+            if src_value is None:
+                src_value = ""
+            else:
+                src_value = str(src_value)  # Convert to string (handles float/int)
+
+            # Skip only if BOTH conditions met:
+            # 1. No name (narrator line)
+            # 2. Empty source text
+            # Keep rows with name even if src is empty (dialogue placeholder)
+            if not name_value.strip() and not src_value.strip():
                 excel_row_num += 1
                 continue
-
-            name_value = row[name_index] if row[name_index] else ""
 
             rows_data.append(RowData(
                 row_id=row_id,
