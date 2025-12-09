@@ -57,10 +57,10 @@ def test_read_with_empty_cells():
 
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
 
     xlsx = XLSXCore(config)
-    result = xlsx.readXlsx()
+    result = xlsx.readXlsx("s4_1")
 
     lines = result.strip().split('\n')
     print(f"✅ Read {len(lines)} lines")
@@ -70,11 +70,15 @@ def test_read_with_empty_cells():
         data = json.loads(line)
         print(f"  ID {data['id']}: name='{data['name']}', src='{data['src']}'")
 
-    assert len(lines) == 5, "Should read 5 rows"
+    # Expected 4 rows (not 5):
+    # - Row 2: Reika | ごめんなさい... ✓
+    # - Row 3: (empty) | その声は... ✓
+    # - Row 4: Reika | 私、もう... ✓
+    # - Row 5: Reika | (empty) ✓ (kept because has name)
+    # - Row 6: (empty) | (empty) ✗ (skipped - both empty)
+    assert len(lines) == 4, "Should read 4 rows (row 6 skipped)"
     assert json.loads(lines[1])['name'] == '', "Row 2 name should be empty"
     assert json.loads(lines[3])['src'] == '', "Row 4 src should be empty"
-    assert json.loads(lines[4])['name'] == '', "Row 5 name should be empty"
-    assert json.loads(lines[4])['src'] == '', "Row 5 src should be empty"
 
     print("✅ Empty cells handled correctly")
 
@@ -109,12 +113,12 @@ def test_sheet_not_found():
 
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
-    config.xlsx.sheetName = "InvalidSheet"
+    config.xlsx.sheetName = ["InvalidSheet"]  # Must be list
 
     xlsx = XLSXCore(config)
 
     try:
-        xlsx.readXlsx()
+        xlsx.readXlsx("InvalidSheet")
         assert False, "Should raise ValueError"
     except ValueError as e:
         print(f"✅ Correct error: {e}")
@@ -133,13 +137,13 @@ def test_column_not_found():
 
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
     config.xlsx.nameColumn = "invalid_column"
 
     xlsx = XLSXCore(config)
 
     try:
-        xlsx.readXlsx()
+        xlsx.readXlsx("s4_1")
         assert False, "Should raise ValueError"
     except ValueError as e:
         print(f"✅ Correct error: {e}")
@@ -159,14 +163,19 @@ def test_write_valid_jsonline():
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
     config.xlsx.outputPath = str(output_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
 
     jsonline = '''{"id":1,"dst":"ขอโทษนะที่เรียกมาตอนเย็นแบบนี้"}
 {"id":2,"dst":"เสียงนั้นแตกต่างจากปกติ ดังกังวานในหูอย่างนุ่มนวล"}
 {"id":3,"dst":"ฉันตัดสินใจแล้ว"}'''
 
     xlsx = XLSXCore(config)
-    xlsx.writeXlsx(jsonline)
+
+    # Must read first to build row mapping
+    xlsx.readXlsx("s4_1")
+
+    # Now write with sheet_name parameter
+    xlsx.writeXlsx(jsonline, sheet_name="s4_1")
 
     assert output_file.exists(), "Output file should be created"
     print(f"✅ Output created: {output_file}")
@@ -183,7 +192,7 @@ def test_write_invalid_json():
 
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
 
     invalid_json = '''{"id":1,"dst":"valid"}
 {invalid json here}
@@ -191,8 +200,11 @@ def test_write_invalid_json():
 
     xlsx = XLSXCore(config)
 
+    # Read first (though error will happen before write)
+    xlsx.readXlsx("s4_1")
+
     try:
-        xlsx.writeXlsx(invalid_json)
+        xlsx.writeXlsx(invalid_json, sheet_name="s4_1")
         assert False, "Should raise ValueError"
     except ValueError as e:
         print(f"✅ Correct error: {e}")
@@ -211,7 +223,7 @@ def test_write_missing_keys():
 
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
 
     missing_dst = '''{"id":1,"dst":"valid"}
 {"id":2}
@@ -219,8 +231,11 @@ def test_write_missing_keys():
 
     xlsx = XLSXCore(config)
 
+    # Read first (though error will happen before write)
+    xlsx.readXlsx("s4_1")
+
     try:
-        xlsx.writeXlsx(missing_dst)
+        xlsx.writeXlsx(missing_dst, sheet_name="s4_1")
         assert False, "Should raise ValueError"
     except ValueError as e:
         print(f"✅ Correct error: {e}")
@@ -241,14 +256,19 @@ def test_write_id_not_found():
     config = CConfig("config.yaml")
     config.xlsx.filePath = str(test_file)
     config.xlsx.outputPath = str(output_file)
-    config.xlsx.sheetName = "s4_1"
+    config.xlsx.sheetName = ["s4_1"]  # Must be list
 
     jsonline = '''{"id":1,"dst":"Translation 1"}
 {"id":999,"dst":"This ID doesn't exist"}
 {"id":2,"dst":"Translation 2"}'''
 
     xlsx = XLSXCore(config)
-    xlsx.writeXlsx(jsonline)
+
+    # Must read first to build row mapping
+    xlsx.readXlsx("s4_1")
+
+    # Now write
+    xlsx.writeXlsx(jsonline, sheet_name="s4_1")
 
     print("✅ Non-existent IDs skipped with warning")
 

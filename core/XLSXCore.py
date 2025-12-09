@@ -53,7 +53,8 @@ class XLSXCore:
         """
         self.config = config
         self.xlsx_config = config.xlsx
-        self.row_mapping: Dict[int, int] = {}  # Maps JSONLine ID -> Excel row number
+        # Per-sheet mapping: sheet_name -> {JSONLine ID -> Excel row number}
+        self.row_mappings: Dict[str, Dict[int, int]] = {}
 
     def readXlsx(self, sheet_name: Optional[str] = None) -> str:
         """
@@ -82,13 +83,16 @@ class XLSXCore:
         if self.xlsx_config.validateColumns:
             self._validate_columns(sheet)
 
-        rows_data = self._extract_rows(sheet)
+        # Extract rows and store per-sheet mapping
+        rows_data, row_mapping = self._extract_rows(sheet)
+        self.row_mappings[target_sheet] = row_mapping  # Store for later writeXlsx()
+
         jsonline = self._format_as_jsonline(rows_data)
 
         workbook.close()
         return jsonline
 
-    def writeXlsx(self, jsonline_input: str) -> None:
+    def writeXlsx(self, jsonline_input: str, sheet_name: Optional[str] = None) -> None:
         """
         Write translated JSONLine to XLSX file.
 
@@ -98,6 +102,7 @@ class XLSXCore:
 
         Args:
             jsonline_input: JSONLine string with translations
+            sheet_name: Optional sheet name to write to. If None, uses config.sheetName[0]
 
         Raises:
             FileNotFoundError: If source XLSX doesn't exist
@@ -108,8 +113,19 @@ class XLSXCore:
         source_path = Path(self.xlsx_config.filePath)
         self._validate_file_exists(source_path)
 
+        # Determine target sheet (default to first configured sheet)
+        target_sheet = sheet_name if sheet_name else self.xlsx_config.sheetName[0]
+
+        # Get row mapping for this specific sheet
+        if target_sheet not in self.row_mappings:
+            raise ValueError(
+                f"No row mapping found for sheet '{target_sheet}'. "
+                f"Did you call readXlsx('{target_sheet}') first?"
+            )
+        row_mapping = self.row_mappings[target_sheet]
+
         workbook = load_workbook(source_path)
-        sheet = self._get_sheet(workbook, self.xlsx_config.sheetName)
+        sheet = self._get_sheet(workbook, target_sheet)
 
         column_index = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn)
 
@@ -127,12 +143,12 @@ class XLSXCore:
 
             column_index2 = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn2)
             written_count = self._write_dual_translations(
-                sheet, column_index, column_index2, translations
+                sheet, column_index, column_index2, translations, row_mapping
             )
             print(f"✅ Written {written_count} dual translations (direct + localized) to {output_path}")
         else:
             # Single-target mode: write to one column
-            written_count = self._write_translations(sheet, column_index, translations)
+            written_count = self._write_translations(sheet, column_index, translations, row_mapping)
             print(f"✅ Written {written_count} translations to {output_path}")
 
         workbook.save(output_path)
@@ -173,6 +189,14 @@ class XLSXCore:
                 # Parse translations
                 translations = self._parse_jsonline(jsonline_input)
 
+                # Get row mapping for this specific sheet (🔥 KEY FIX!)
+                if sheet_name not in self.row_mappings:
+                    raise ValueError(
+                        f"No row mapping found for sheet '{sheet_name}'. "
+                        f"Did you call readXlsx('{sheet_name}') first?"
+                    )
+                row_mapping = self.row_mappings[sheet_name]
+
                 # Get target sheet
                 sheet = self._get_sheet(workbook, sheet_name)
 
@@ -188,11 +212,11 @@ class XLSXCore:
                         )
                     column_index2 = self._get_or_create_column_index(sheet, self.xlsx_config.targetColumn2)
                     written_count = self._write_dual_translations(
-                        sheet, column_index, column_index2, translations
+                        sheet, column_index, column_index2, translations, row_mapping
                     )
                 else:
                     # Single-target mode
-                    written_count = self._write_translations(sheet, column_index, translations)
+                    written_count = self._write_translations(sheet, column_index, translations, row_mapping)
 
                 total_written += written_count
                 sheets_processed.append(f"{sheet_name} ({written_count} sentences)")
@@ -282,8 +306,13 @@ class XLSXCore:
 
         return new_column_index
 
-    def _extract_rows(self, sheet: Worksheet) -> List[RowData]:
-        """Extract data rows from worksheet, skipping empty narrator rows"""
+    def _extract_rows(self, sheet: Worksheet) -> Tuple[List[RowData], Dict[int, int]]:
+        """
+        Extract data rows from worksheet, skipping empty narrator rows.
+
+        Returns:
+            Tuple of (rows_data, row_mapping) where row_mapping maps JSONLine ID -> Excel row
+        """
         header_row = next(sheet.iter_rows(min_row=1, max_row=1, values_only=True))
         headers = [str(h) if h else "" for h in header_row]
 
@@ -291,6 +320,7 @@ class XLSXCore:
         src_index = headers.index(self.xlsx_config.srcColumn)
 
         rows_data = []
+        row_mapping = {}  # Local mapping for this sheet
         row_id = 1
         excel_row_num = 2  # Excel rows start at 2 (after header)
 
@@ -324,13 +354,13 @@ class XLSXCore:
                 src=str(src_value)
             ))
 
-            # Store mapping for later use in writeXlsx
-            self.row_mapping[row_id] = excel_row_num
+            # Store mapping in local dict (not instance variable)
+            row_mapping[row_id] = excel_row_num
 
             row_id += 1
             excel_row_num += 1
 
-        return rows_data
+        return rows_data, row_mapping
 
     def _format_as_jsonline(self, rows_data: List[RowData]) -> str:
         """Convert rows to JSONLine format"""
@@ -409,10 +439,17 @@ class XLSXCore:
         self,
         sheet: Worksheet,
         column_index: int,
-        translations: Dict[int, str]
+        translations: Dict[int, str],
+        row_mapping: Dict[int, int]
     ) -> int:
         """
-        Write translations to worksheet using row mapping.
+        Write translations to worksheet using provided row mapping.
+
+        Args:
+            sheet: Target worksheet
+            column_index: Column to write to
+            translations: Dict mapping JSONLine ID -> translated text
+            row_mapping: Dict mapping JSONLine ID -> Excel row number
 
         Returns:
             Number of rows written
@@ -421,11 +458,11 @@ class XLSXCore:
 
         for json_id, translated_text in translations.items():
             # Use mapping to find correct Excel row
-            if json_id not in self.row_mapping:
+            if json_id not in row_mapping:
                 print(f"⚠️  Warning: JSONLine ID {json_id} not found in row mapping, skipping")
                 continue
 
-            excel_row = self.row_mapping[json_id]
+            excel_row = row_mapping[json_id]
             sheet.cell(row=excel_row, column=column_index).value = translated_text
             written_count += 1
 
@@ -436,10 +473,18 @@ class XLSXCore:
         sheet: Worksheet,
         column_index1: int,
         column_index2: int,
-        translations: Dict[int, Tuple[str, str]]
+        translations: Dict[int, Tuple[str, str]],
+        row_mapping: Dict[int, int]
     ) -> int:
         """
         Write dual translations (direct + localized) to two columns.
+
+        Args:
+            sheet: Target worksheet
+            column_index1: Column for direct translation
+            column_index2: Column for localized translation
+            translations: Dict mapping JSONLine ID -> (direct, localized) tuple
+            row_mapping: Dict mapping JSONLine ID -> Excel row number
 
         Returns:
             Number of rows written
@@ -448,11 +493,11 @@ class XLSXCore:
 
         for json_id, (direct_trans, localized_trans) in translations.items():
             # Use mapping to find correct Excel row
-            if json_id not in self.row_mapping:
+            if json_id not in row_mapping:
                 print(f"⚠️  Warning: JSONLine ID {json_id} not found in row mapping, skipping")
                 continue
 
-            excel_row = self.row_mapping[json_id]
+            excel_row = row_mapping[json_id]
 
             # Write direct translation to column 1
             sheet.cell(row=excel_row, column=column_index1).value = direct_trans
