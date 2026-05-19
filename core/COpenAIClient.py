@@ -268,17 +268,25 @@ class COpenAIClient:
             # Try alternative format without language specifier
             jsonline_start = content.find("```")
             if jsonline_start == -1:
-                raise ValueError("No JSONLine code block found in content")
-            jsonline_start += len("```")
+                # Fallback: treat raw content as JSONLine (model skipped code block)
+                self.logger.warning("No code block found, attempting to parse raw content as JSONLine")
+                jsonline_content = content.strip()
+            else:
+                jsonline_start += len("```")
+                jsonline_end = content.find("```", jsonline_start)
+                if jsonline_end == -1:
+                    self.logger.warning("Unclosed JSONLine code block, parsing to end of content")
+                    jsonline_content = content[jsonline_start:].strip()
+                else:
+                    jsonline_content = content[jsonline_start:jsonline_end].strip()
         else:
             jsonline_start += len("```jsonline")
-
-        jsonline_end = content.find("```", jsonline_start)
-        if jsonline_end == -1:
-            raise ValueError("Unclosed JSONLine code block")
-
-        # Extract JSONLine content
-        jsonline_content = content[jsonline_start:jsonline_end].strip()
+            jsonline_end = content.find("```", jsonline_start)
+            if jsonline_end == -1:
+                self.logger.warning("Unclosed JSONLine code block, parsing to end of content")
+                jsonline_content = content[jsonline_start:].strip()
+            else:
+                jsonline_content = content[jsonline_start:jsonline_end].strip()
 
         if not jsonline_content:
             raise ValueError("Empty JSONLine content")

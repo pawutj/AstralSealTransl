@@ -421,6 +421,16 @@ def translate_with_api(
                     "dst2": item["dst1"]  # Duplicate
                 }, ensure_ascii=False)
             )
+        elif 'dst2' in item and is_dual_target:
+            # Fallback: API returned only dst2 (incomplete dual-target)
+            # Duplicate dst2 to both columns
+            result_lines.append(
+                json.dumps({
+                    "id": item["id"],
+                    "dst1": item["dst2"],  # Duplicate
+                    "dst2": item["dst2"]
+                }, ensure_ascii=False)
+            )
         elif 'dst' in item:
             # Single-target mode (backward compatibility)
             result_lines.append(
