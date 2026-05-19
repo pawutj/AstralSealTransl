@@ -271,9 +271,16 @@ class RPYCore:
 
             if 'id' not in data:
                 raise ValueError(f"Missing 'id' field at line {line_num}: {line}")
-            if 'dst' not in data:
+
+            if 'dst' in data:
+                dst = data['dst']
+            elif 'dst2' in data:
+                dst = data['dst2']  # Two-step prompt: prefer localized version
+            elif 'dst1' in data:
+                dst = data['dst1']  # Two-step prompt: fallback to direct translation
+            else:
                 raise ValueError(f"Missing 'dst' field at line {line_num}: {line}")
 
-            translations[int(data['id'])] = str(data['dst'])
+            translations[int(data['id'])] = str(dst)
 
         return translations

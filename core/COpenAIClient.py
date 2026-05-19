@@ -275,8 +275,15 @@ class COpenAIClient:
                 jsonline_start += len("```")
                 jsonline_end = content.find("```", jsonline_start)
                 if jsonline_end == -1:
-                    self.logger.warning("Unclosed JSONLine code block, parsing to end of content")
-                    jsonline_content = content[jsonline_start:].strip()
+                    after_content = content[jsonline_start:].strip()
+                    before_content = content[:jsonline_start - len("```")].strip()
+                    if not after_content and before_content:
+                        # The ``` is a closing marker (primed response), use content before it
+                        self.logger.warning("Found closing code block marker, parsing content before it as JSONLine")
+                        jsonline_content = before_content
+                    else:
+                        self.logger.warning("Unclosed JSONLine code block, parsing to end of content")
+                        jsonline_content = after_content
                 else:
                     jsonline_content = content[jsonline_start:jsonline_end].strip()
         else:
